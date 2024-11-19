@@ -8,6 +8,9 @@ from dotenv import load_dotenv
 from duckdb import DuckDBPyRelation
 from pandas import DataFrame
 
+#  carregar as variaveis do arquivo .env
+load_dotenv()
+
 # download all files
 def baixar_os_arquivos_do_google_drive(url_pasta, diretorio_local):
     # create pasta
@@ -34,7 +37,7 @@ def ler_csv(caminho_do_arquivo):
 
 # Transformation 
 def transformar(df: DuckDBPyRelation) -> DataFrame:
-    df_transformado = duckdb.sql("select *, (quantidade * valor) as total_vendas from df").df()
+    df_transformado = duckdb.sql("select data_venda,valor,quantidade,cliente_id,categoria,(valor * quantidade) as total_vendas from df").df()
     ##print(df_transformado)
     return df_transformado
 
@@ -49,6 +52,9 @@ if __name__ == "__main__":
     diretorio_local = './pasta_gdown'
     
     ##baixar_os_arquivos_do_google_drive(url_pasta, diretorio_local)
-    arquivos = listar_aquivos_csv(diretorio_local)
-    data_frame_duckdb = ler_csv(arquivos)
-    transformar(data_frame_duckdb)
+    lista_arquivos = listar_aquivos_csv(diretorio_local)
+
+    for caminho_do_arquivo in lista_arquivos:
+        duck_db_df = ler_csv(caminho_do_arquivo)
+        pandas_df_transformado = transformar(duck_db_df)
+        salvar_no_postgres(pandas_df_transformado, "vendas_calculado")

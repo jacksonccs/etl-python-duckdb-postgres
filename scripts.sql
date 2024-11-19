@@ -33,3 +33,9 @@ insert into vendas(data_venda,valor,quantidade,cliente_id,categoria) values
 ('2024-01-05',290.4,1,28,'Brinquedos'),
 ('2024-01-05',240.5,8,20,'Eletrônicos'),
 ('2024-01-05',155.0,3,45,'Roupas')
+
+--
+
+insert into vendas_calculado(data_venda,valor,quantidade,cliente_id,categoria,total_vendas) 
+select  data_venda,valor,quantidade,cliente_id,categoria,(valor * quantidade) as total_vendas from vendas
+
