@@ -8,8 +8,27 @@ from dotenv import load_dotenv
 from duckdb import DuckDBPyRelation
 from pandas import DataFrame
 
+from datetime import datetime
+
 #  carregar as variaveis do arquivo .env
 load_dotenv()
+
+def conectar_banco():
+    return duckdb.connect(database='duckdb.db', read_only=False)
+
+def inicializar_tabela(con):
+    con.execute("""create table if not exists historico_arquivos 
+                (   nome_arquivo          varchar, 
+                    horario_processamento timestamp  )
+            """)
+    
+def registrar_arquivo(con, nome_arquivo):
+    con.execute("""insert into historico_arquivos (nome_arquivo, horario_processamento)
+                   values (?, ?)
+                """, (nome_arquivo, datetime.now()))
+
+def arquivos_processados(con):
+    return set(row[0] for row in con.execute("select nome_arquivo from historico_arquivos").fetchall())
 
 # download all files
 def baixar_os_arquivos_do_google_drive(url_pasta, diretorio_local):
@@ -19,7 +38,7 @@ def baixar_os_arquivos_do_google_drive(url_pasta, diretorio_local):
     gdown.download_folder(url_pasta, output=diretorio_local, quiet=False, use_cookies=False)
 
 # list all files in pasta
-def listar_aquivos_csv(diretorio):
+def listar_arquivos_csv(diretorio):
     arquivos_csv = []
     todos_os_arquivos = os.listdir(diretorio)
     for arquivo in todos_os_arquivos:
@@ -51,10 +70,18 @@ if __name__ == "__main__":
     url_pasta = 'https://drive.google.com/drive/folders/19flL9P8UV9aSu4iQtM6Ymv-77VtFcECP'
     diretorio_local = './pasta_gdown'
     
-    ##baixar_os_arquivos_do_google_drive(url_pasta, diretorio_local)
-    lista_arquivos = listar_aquivos_csv(diretorio_local)
-
-    for caminho_do_arquivo in lista_arquivos:
-        duck_db_df = ler_csv(caminho_do_arquivo)
-        pandas_df_transformado = transformar(duck_db_df)
-        salvar_no_postgres(pandas_df_transformado, "vendas_calculado")
+    # baixar_pasta_google_drive(url_pasta, diretorio_local)
+    arquivos_csv = listar_arquivos_csv(diretorio_local)
+    con = conectar_banco()
+    inicializar_tabela(con)
+    processados = arquivos_processados(con)
+    for caminho_do_arquivo in arquivos_csv:
+        nome_arquivo = os.path.basename(caminho_do_arquivo)
+        if nome_arquivo not in processados:
+            df = ler_csv(caminho_do_arquivo)
+            df_transformado = transformar(df)
+            salvar_no_postgres(df_transformado, "vendas_calculado")
+            registrar_arquivo(con, nome_arquivo)
+            print(f"Arquivo {nome_arquivo} processado e salvo.")
+        else:
+            print(f"Arquivo {nome_arquivo} já foi processado anteriormente.")
